@@ -141,7 +141,7 @@ func main() {
 	now := time.Now()
 	/*options := ntp.QueryOptions{Timeout: 1 * time.Second}
 		response, err := ntp.QueryWithOptions("pool.ntp.org", options)
-		if err != nil {
+		ify err != nil {
 			fmt.Printf("err=%v", err)
 			os.Exit(1)
 		} else {
@@ -191,8 +191,8 @@ func main() {
 		prev = funcs[prevMod](prevToken)
 		curr = funcs[currMod](currentToken)
 		next = funcs[nextMod](nextToken)
-		s2 := fmt.Sprintf(sfmt, width, width, cname, prev, curr, next)
-		log.Print(s2)
+		s := fmt.Sprintf(sfmt, width, width, cname, prev, curr, next)
+		log.Print(s)
 	}
 	nwidth := width
 	if nwidth > 34 {
@@ -208,16 +208,17 @@ func main() {
 	if equals < 0 {
 		equals = 0
 	}
-	s2 := fmt.Sprintf("[%s%*s]", sleft, -gap, strings.Repeat("=", equals))
-	var v aurora.Value
+	bar := fmt.Sprintf("[%s%*s]", sleft, -gap, strings.Repeat("=", equals))
+	barlen := len(bar)
+	var cbar aurora.Value
 
 	switch {
 	case progress < 20:
-		v = au.BrightGreen(s2)
+		cbar = au.BrightGreen(bar)
 	case progress < 25:
-		v = au.BrightYellow(s2)
+		cbar = au.BrightYellow(bar)
 	default:
-		v = au.BrightRed(s2)
+		cbar = au.BrightRed(bar)
 	}
 	prevID := prevTS%100 + 1
 	currID := currentTS%100 + 1
@@ -227,6 +228,7 @@ func main() {
 	if shift < 0 {
 		shift = 0
 	}
-	s3 := fmt.Sprintf("%*s %6d %6d %6d%s", -width+shift, v, dfuncs[prevMod](prevID), dfuncs[currMod](currID), dfuncs[nextMod](nextID), au.White(""))
-	log.Print(s3)
+	spaces := strings.Repeat(" ", 5-shift)
+	s := fmt.Sprintf("%*s%s%2d %6d %6d%s", -barlen, cbar, spaces, dfuncs[prevMod](prevID), dfuncs[currMod](currID), dfuncs[nextMod](nextID), au.White(""))
+	log.Print(s)
 }
