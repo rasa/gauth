@@ -3,6 +3,8 @@
 gauth: replace Google Authenticator
 ===================================
 
+<img src="https://raw.githubusercontent.com/rasa/gauth/master/gauth-demo.gif" height="50%" width="50%"/>
+
 Installation
 ------------
 
@@ -53,7 +55,7 @@ Encryption
 `gauth` will then prompt you for that password on every run:
 
         $ gauth
-        Encryption password: 
+        Encryption password:
                    prev   curr   next
         LastPass   915200 479333 408710
 
