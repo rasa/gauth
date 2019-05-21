@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -e
+
+while true; do
+    clear -x
+    ./gauth -colors
+    sleep 1
+done
+
