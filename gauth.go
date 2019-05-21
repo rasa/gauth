@@ -9,21 +9,37 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/csv"
+	"flag"
 	"fmt"
-	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"log"
 	"math/big"
+
+	//"os"
 	"os/user"
 	"path"
 	"strings"
 	"syscall"
 	"time"
+
+	//"github.com/beevik/ntp"
+	"github.com/logrusorgru/aurora"
+	"github.com/mattn/go-colorable"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
-func TimeStamp() (int64, int) {
-	time := time.Now().Unix()
-	return time / 30, int(time % 30)
+var au aurora.Aurora
+
+var colors = flag.Bool("colors", false, "enable or disable colors")
+
+func init() {
+	flag.Parse()
+	//if ! isatty.IsTerminal(os.Stdout.Fd()) {
+	//  *colors = false
+	//}
+	au = aurora.NewAurora(*colors)
+	log.SetFlags(0)
+	log.SetOutput(colorable.NewColorableStdout())
 }
 
 func normalizeSecret(sec string) string {
@@ -74,7 +90,8 @@ func main() {
 	if e != nil {
 		log.Fatal(e)
 	}
-	cfgPath := path.Join(user.HomeDir, ".config/gauth.csv")
+	csvFile := "gauth.csv"
+	cfgPath := path.Join(user.HomeDir, ".config/"+csvFile)
 
 	cfgContent, e := ioutil.ReadFile(cfgPath)
 	if e != nil {
@@ -84,7 +101,7 @@ func main() {
 	// Support for 'openssl enc -aes-128-cbc -md sha256 -pass pass:'
 	if bytes.Compare(cfgContent[:8], []byte{0x53, 0x61, 0x6c, 0x74, 0x65, 0x64, 0x5f, 0x5f}) == 0 {
 		fmt.Printf("Encryption password: ")
-		passwd, e := terminal.ReadPassword(syscall.Stdin)
+		passwd, e := terminal.ReadPassword(int(syscall.Stdin))
 		fmt.Printf("\n")
 		if e != nil {
 			log.Fatal(e)
@@ -121,18 +138,95 @@ func main() {
 		log.Fatal(e)
 	}
 
-	currentTS, progress := TimeStamp()
+	now := time.Now()
+	/*options := ntp.QueryOptions{Timeout: 1 * time.Second}
+		response, err := ntp.QueryWithOptions("pool.ntp.org", options)
+		if err != nil {
+			fmt.Printf("err=%v", err)
+			os.Exit(1)
+		} else {
+			fmt.Printf("response.ClockOffset=%v\n", response.ClockOffset)
+			now = now.Add(response.ClockOffset)
+	  }
+	*/
+	// align with Google Authenticator & Authy
+	//anow := now.Add(-2 * time.Second)
+	time := now.Unix()
+	currentTS := time / 30
+	progress := int(time % 30)
+
 	prevTS := currentTS - 1
 	nextTS := currentTS + 1
 
-	fmt.Println("           prev   curr   next")
+	stime := now.Format("15:04:05")
+	account := fmt.Sprintf("%s %s", stime, csvFile)
+	width := len(account)
+	for _, record := range cfg {
+		if len(record[0]) > width {
+			width = len(record[0])
+		}
+	}
+
+	sfmt := "%-*.*s %6s %6s %6s"
+
+	type ColorFunc func(interface{}) aurora.Value
+	funcs := []ColorFunc{au.BrightWhite, au.BrightMagenta, au.BrightCyan, au.BrightGreen, au.BrightYellow, au.BrightRed}
+	n := int64(len(funcs))
+	prevMod := prevTS % n
+	currMod := currentTS % n
+	nextMod := nextTS % n
+	cname := au.BrightWhite(account).Underline()
+	prev := funcs[prevMod]("-30s").Underline()
+	curr := funcs[currMod]("now").Underline()
+	next := funcs[nextMod]("+30s").Underline()
+
+	log.Printf(sfmt+"\n", width, width, cname, prev, curr, next)
 	for _, record := range cfg {
 		name := record[0]
+		cname = au.White(name)
 		secret := normalizeSecret(record[1])
 		prevToken := authCodeOrDie(secret, prevTS)
 		currentToken := authCodeOrDie(secret, currentTS)
 		nextToken := authCodeOrDie(secret, nextTS)
-		fmt.Printf("%-10s %s %s %s\n", name, prevToken, currentToken, nextToken)
+		prev = funcs[prevMod](prevToken)
+		curr = funcs[currMod](currentToken)
+		next = funcs[nextMod](nextToken)
+		s2 := fmt.Sprintf(sfmt, width, width, cname, prev, curr, next)
+		log.Print(s2)
 	}
-	fmt.Printf("[%-29s]\n", strings.Repeat("=", progress))
+	nwidth := width
+	if nwidth > 34 {
+		nwidth = 34
+	}
+	left := 30 - progress
+	sleft := fmt.Sprintf("%2d", left)
+	gap := nwidth - 4
+	equals := progress + 1
+	if gap < 30 {
+		equals -= 30 - gap
+	}
+	if equals < 0 {
+		equals = 0
+	}
+	s2 := fmt.Sprintf("[%s%*s]", sleft, -gap, strings.Repeat("=", equals))
+	var v aurora.Value
+
+	switch {
+	case progress < 20:
+		v = au.BrightGreen(s2)
+	case progress < 25:
+		v = au.BrightYellow(s2)
+	default:
+		v = au.BrightRed(s2)
+	}
+	prevID := prevTS%100 + 1
+	currID := currentTS%100 + 1
+	nextID := nextTS%100 + 1
+	dfuncs := []ColorFunc{au.White, au.Magenta, au.Cyan, au.Green, au.Yellow, au.Red}
+	shift := progress - 25
+	if shift < 0 {
+		shift = 0
+	}
+	s3 := fmt.Sprintf("%*s %6d %6d %6d%s", -width+shift, v, dfuncs[prevMod](prevID), dfuncs[currMod](currID), dfuncs[nextMod](nextID), au.White(""))
+	log.Print(s3)
 }
