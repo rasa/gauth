@@ -3,7 +3,7 @@
 gauth: replace Google Authenticator
 ===================================
 
-<img src="https://raw.githubusercontent.com/rasa/gauth/master/gauth-demo.gif" height="50%" width="50%"/>
+<img src="https://raw.githubusercontent.com/rasa/gauth/master/gauth-demo.gif" height="70%" width="70%"/>
 
 Installation
 ------------
